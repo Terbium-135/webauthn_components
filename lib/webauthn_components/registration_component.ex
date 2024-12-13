@@ -63,6 +63,7 @@ defmodule WebauthnComponents.RegistrationComponent do
   import WebauthnComponents.IconComponents
   import WebauthnComponents.BaseComponents
   alias WebauthnComponents.WebauthnUser
+  alias WebauthnComponents.WebauthnCredential
 
   def mount(socket) do
     {
@@ -193,7 +194,7 @@ defmodule WebauthnComponents.RegistrationComponent do
       challenge: Base.encode64(challenge.bytes, padding: false),
       excludeCredentials:
         for credential <- excluded_credentials do
-          {credential.id, credential.public_key}
+          %WebauthnCredential{id: credential.id, public_key: credential.public_key}
         end,
       id: id,
       residentKey: resident_key,

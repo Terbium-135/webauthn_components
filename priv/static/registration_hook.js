@@ -40,6 +40,15 @@ export const RegistrationHook = {
 
       console.log("excludeCredentials");
       console.log(excludeCredentials);
+
+      excludedCredentials = new Array();
+      for (const credential of excludeCredentials) {
+        excludedCredentials.push({ id: credential.id, publicKey: credential.public_key });
+      };
+      console.log("excludedCredentials");
+      console.log(excludedCredentials);
+
+
       user.id = base64ToArray(user.id).buffer;
 
       const publicKey = {
@@ -51,7 +60,7 @@ export const RegistrationHook = {
           requireResidentKey: requireResidentKey,
         },
         challenge: challengeArray.buffer,
-        excludeCredentials,
+        excludedCredentials,
         pubKeyCredParams: [
           { alg: -7, type: "public-key" },
           { alg: -257, type: "public-key" },

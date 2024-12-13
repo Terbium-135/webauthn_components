@@ -32,11 +32,13 @@ defmodule WebauthnComponents.AuthenticationComponent do
 
   If the authenticator is not supporting resident keys you have to provide a list of `%WebauthnCredentials{}` either by using:
   - `@user` (Optional) A user identifier like e-mail or user name as a string
-  - `@retrieve_credentials_function` (Optional) A function of the type `@spec retrieve_credentials_for(binary) :: [%WebauthnCredential{}]` which is supposed to get the IDs and the public keys for a given user 
+  - `@retrieve_allow_credentials_function` (Optional) A function of the type `@spec allow_retrieve_credentials_for(binary) :: [%WebauthnCredential{}]` which is supposed to get the IDs and the public keys for a given user 
+  - `@retrieve_exclude_credentials_function` (Optional) A function of the type `@spec retrieve_exclude_credentials_for(binary) :: [%WebauthnCredential{}]` which is supposed to get the IDs and the public keys for a given user 
 
   or
 
   - `@allow_credentials` (Optional) A list of `%WebauthnCredentials{}`
+  - `@exclude_credentials` (Optional) A list of `%WebauthnCredentials{}`
 
   ## Events
 
@@ -71,8 +73,10 @@ defmodule WebauthnComponents.AuthenticationComponent do
       |> assign_new(:show_icon?, fn -> true end)
       |> assign_new(:relying_party, fn -> nil end)
       |> assign_new(:allow_credentials, fn -> [] end)
+      |> assign_new(:exclude_credentials, fn -> [] end)
       |> assign_new(:user, fn -> nil end)
-      |> assign_new(:retrieve_credentials_function, fn -> nil end)
+      |> assign_new(:retrieve_allow_credentials_function, fn -> nil end)
+      |> assign_new(:retrieve_exclude_credentials_function, fn -> nil end)
     }
   end
 
@@ -145,7 +149,9 @@ defmodule WebauthnComponents.AuthenticationComponent do
     %{
       id: id,
       allow_credentials: allow_credentials,
-      retrieve_credentials_function: retrieve_credentials_function,
+      exclude_credentials: exclude_credentials,
+      retrieve_allow_credentials_function: retrieve_allow_credentials_function,
+      retrieve_exclude_credentials_function: retrieve_exclude_credentials_function,
       user: user
     } = assigns
 
@@ -159,18 +165,29 @@ defmodule WebauthnComponents.AuthenticationComponent do
     # If both, a function and a user are supplied, call that function to retrieve the credentials for
     # the given user
     # Otherwise: use the allow_credential list which might be preset instead
-    credentials =
-      if is_nil(retrieve_credentials_function) and is_nil(user) do
+    allowed_credentials =
+      if is_nil(retrieve_allow_credentials_function) and is_nil(user) do
         allow_credentials
       else
-        retrieve_credentials_function.(user)
+        retrieve_allow_credentials_function.(user)
+      end
+
+    excluded_credentials =
+      if is_nil(retrieve_exclude_credentials_function) and is_nil(user) do
+        exclude_credentials
+      else
+        retrieve_exclude_credentials_function.(user)
       end
 
     challenge =
       Wax.new_authentication_challenge(
         # WAX_ expects a list of maps, we have been using structs to do the xfer: So convert back
         allow_credentials:
-          for credential <- credentials do
+          for credential <- allowed_credentials do
+            {credential.id, credential.public_key}
+          end,
+        exclude_credentials:
+          for credential <- excluded_credentials do
             {credential.id, credential.public_key}
           end,
         origin: endpoint.url(),
@@ -178,13 +195,15 @@ defmodule WebauthnComponents.AuthenticationComponent do
         user_verification: "preferred"
       )
 
-    allow_credentials_ids = Enum.map(credentials, &Base.encode64(&1.id))
+    allow_credentials_ids = Enum.map(allowed_credentials, &Base.encode64(&1.id))
+    exclude_credentials_ids = Enum.map(excluded_credentials, &Base.encode64(&1.id))
 
     challenge_data = %{
       challenge: Base.encode64(challenge.bytes, padding: false),
       id: id,
       rpId: challenge.rp_id,
       allowCredentialsIDs: allow_credentials_ids,
+      excludeCredentialsIDs: exclude_credentials_ids,
       userVerification: challenge.user_verification
     }
 

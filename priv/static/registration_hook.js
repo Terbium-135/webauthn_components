@@ -36,6 +36,10 @@ export const RegistrationHook = {
       } = event;
       const challengeArray = base64ToArray(challenge);
 
+      console.log(user);
+
+      console.log("excludeCredentials");
+      console.log(excludeCredentials);
       user.id = base64ToArray(user.id).buffer;
 
       const publicKey = {
@@ -67,11 +71,15 @@ export const RegistrationHook = {
       const attestation64 = arrayBufferToBase64(attestationObject);
       const clientData = Array.from(new Uint8Array(clientDataJSON));
       const rawId64 = arrayBufferToBase64(rawId);
+      const transports = response.getTransports();
+      // const authenticatorData = arrayBufferToBase64(response.getAuthenticatorData());
 
       context.pushEventTo(context.el, "registration-attestation", {
         attestation64,
         clientData,
         rawId64,
+        transports,
+        // authenticatorData,
         type,
       });
     } catch (error) {

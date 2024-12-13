@@ -1,6 +1,6 @@
 defmodule WebauthnComponents.RegistrationComponent do
   @moduledoc """
-  A LiveComponent for registering a new Passkey via the WebAuthn API!
+  A LiveComponent for registering a new Passkey via the WebAuthn API.
 
   > Registration = Sign Up
 
@@ -81,6 +81,12 @@ defmodule WebauthnComponents.RegistrationComponent do
       |> assign_new(:display_text, fn -> "Sign Up" end)
       |> assign_new(:show_icon?, fn -> true end)
       |> assign_new(:relying_party, fn -> nil end)
+      #
+      |> assign_new(:click, fn -> "register" end)
+      #
+      |> assign_new(:exclude_credentials, fn -> [] end)
+      |> assign_new(:user, fn -> nil end)
+      |> assign_new(:retrieve_exclude_credentials_function, fn -> nil end)
     }
   end
 
@@ -116,7 +122,7 @@ defmodule WebauthnComponents.RegistrationComponent do
         id={@id}
         phx-hook="RegistrationHook"
         phx-target={@myself}
-        phx-click="register"
+        phx-click={@click}
         data-check_uvpa_available={if @check_uvpa_available, do: "true"}
         data-uvpa_error_message={@uvpa_error_message}
         class={@class}
@@ -132,7 +138,16 @@ defmodule WebauthnComponents.RegistrationComponent do
 
   def handle_event("register", _params, socket) do
     %{assigns: assigns, endpoint: endpoint} = socket
-    %{app: app_name, id: id, resident_key: resident_key, webauthn_user: webauthn_user} = assigns
+
+    %{
+      app: app_name,
+      id: id,
+      resident_key: resident_key,
+      webauthn_user: webauthn_user,
+      exclude_credentials: exclude_credentials,
+      retrieve_exclude_credentials_function: retrieve_exclude_credentials_function,
+      user: user
+    } = assigns
 
     if not is_struct(webauthn_user, WebauthnUser) do
       raise "user must be a WebauthnComponents.WebauthnUser struct."
@@ -140,18 +155,46 @@ defmodule WebauthnComponents.RegistrationComponent do
 
     attestation = "none"
 
+    dbg(user)
+
+    excluded_credentials =
+      if is_nil(retrieve_exclude_credentials_function) and is_nil(user) do
+        exclude_credentials
+      else
+        retrieve_exclude_credentials_function.(user)
+      end
+
+    dbg(excluded_credentials)
+
     challenge =
       Wax.new_registration_challenge(
+        acceptable_authenticator_statuses: [
+          "UPDATE_AVAILABLE",
+          "FIDO_CERTIFIED",
+          "FIDO_CERTIFIED_L1",
+          "FIDO_CERTIFIED_L1plus",
+          "FIDO_CERTIFIED_L2",
+          "FIDO_CERTIFIED_L2plus",
+          "FIDO_CERTIFIED_L3",
+          "FIDO_CERTIFIED_L3plus"
+        ],
         attestation: attestation,
         origin: endpoint.url(),
         rp_id: :auto,
+        exclude_credentials:
+          for credential <- excluded_credentials do
+            {credential.id, credential.public_key}
+          end,
         trusted_attestation_types: [:none, :basic]
       )
 
     challenge_data = %{
       attestation: attestation,
       challenge: Base.encode64(challenge.bytes, padding: false),
-      excludeCredentials: [],
+      excludeCredentials:
+        for credential <- excluded_credentials do
+          {credential.id, credential.public_key}
+        end,
       id: id,
       residentKey: resident_key,
       requireResidentKey: resident_key == :required,
@@ -178,18 +221,25 @@ defmodule WebauthnComponents.RegistrationComponent do
       "attestation64" => attestation_64,
       "clientData" => client_data,
       "rawId64" => raw_id_64,
+      "transports" => transports,
       "type" => "public-key"
     } = payload
 
     attestation = Base.decode64!(attestation_64, padding: false)
     raw_id = Base.decode64!(raw_id_64, padding: false)
+
     wax_response = Wax.register(attestation, client_data, challenge)
 
     case wax_response do
       {:ok, {authenticator_data, _result}} ->
         %{attested_credential_data: %{credential_public_key: public_key}} = authenticator_data
-        key = %{key_id: raw_id, public_key: public_key}
-        send(self(), {:registration_successful, key: key, webauthn_user: webauthn_user})
+        key = %{key_id: raw_id, public_key: public_key, transports: transports}
+
+        send(
+          self(),
+          {:registration_successful,
+           key: key, webauthn_user: webauthn_user, transports: transports}
+        )
 
       {:error, error} ->
         message = Exception.message(error)

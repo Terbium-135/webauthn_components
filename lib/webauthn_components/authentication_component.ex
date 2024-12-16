@@ -172,6 +172,9 @@ defmodule WebauthnComponents.AuthenticationComponent do
         retrieve_allow_credentials_function.(user)
       end
 
+    dbg(retrieve_exclude_credentials_function)
+    dbg(user)
+
     excluded_credentials =
       if is_nil(retrieve_exclude_credentials_function) or is_nil(user) do
         exclude_credentials

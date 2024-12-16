@@ -166,14 +166,14 @@ defmodule WebauthnComponents.AuthenticationComponent do
     # the given user
     # Otherwise: use the allow_credential list which might be preset instead
     allowed_credentials =
-      if is_nil(retrieve_allow_credentials_function) and is_nil(user) do
+      if is_nil(retrieve_allow_credentials_function) or is_nil(user) do
         allow_credentials
       else
         retrieve_allow_credentials_function.(user)
       end
 
     excluded_credentials =
-      if is_nil(retrieve_exclude_credentials_function) and is_nil(user) do
+      if is_nil(retrieve_exclude_credentials_function) or is_nil(user) do
         exclude_credentials
       else
         retrieve_exclude_credentials_function.(user)

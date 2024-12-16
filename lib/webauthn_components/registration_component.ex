@@ -189,6 +189,8 @@ defmodule WebauthnComponents.RegistrationComponent do
         trusted_attestation_types: [:none, :basic]
       )
 
+    exclude_credentials_ids = Enum.map(excluded_credentials, &Base.encode64(&1.id))
+
     challenge_data = %{
       attestation: attestation,
       challenge: Base.encode64(challenge.bytes, padding: false),
@@ -196,6 +198,7 @@ defmodule WebauthnComponents.RegistrationComponent do
         for credential <- excluded_credentials do
           %WebauthnCredential{id: credential.id, public_key: credential.public_key}
         end,
+      excludeCredentialsIDs: exclude_credentials_ids,
       id: id,
       residentKey: resident_key,
       requireResidentKey: resident_key == :required,

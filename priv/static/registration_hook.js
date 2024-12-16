@@ -28,6 +28,7 @@ export const RegistrationHook = {
         attestation,
         challenge,
         excludeCredentials,
+        excludeCredentialsIDs,
         residentKey,
         requireResidentKey,
         rp,
@@ -41,13 +42,21 @@ export const RegistrationHook = {
       console.log("excludeCredentials");
       console.log(excludeCredentials);
 
+      // excludedCredentials = new Array();
+      // for (const credential of excludeCredentials) {
+      //   excludedCredentials.push({ id: credential.id, publicKey: credential.public_key });
+      // };
+      // console.log("excludedCredentials");
+      // console.log(excludedCredentials);
+
+      // allowCredentialsIDs is an array of already base64 encoded IDs
       excludedCredentials = new Array();
-      for (const credential of excludeCredentials) {
-        excludedCredentials.push({ id: credential.id, publicKey: credential.public_key });
+      for (const id of excludeCredentialsIDs) {
+        excludedCredentials.push({ id: base64ToArray(id), type: 'public-key' });
       };
+
       console.log("excludedCredentials");
       console.log(excludedCredentials);
-
 
       user.id = base64ToArray(user.id).buffer;
 
